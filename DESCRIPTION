@@ -1,0 +1,19 @@
+Package: qmdme
+Title: Generate Quarto Code Companions for Source Files
+Version: 0.0.0.9000
+Authors@R:
+    person("Jesse", "Brandt", email = "jesse.a.brandt@gmail.com", role = c("aut", "cre"))
+Description: Produces and updates 'eval=FALSE' Quarto companion files
+    for source code in a research repository. Each source file gets a
+    'qmd/' file with a user-editable prose region above an
+    auto-regenerated code chunk, suitable for inclusion in a Quarto site.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Imports:
+    fs,
+    glue
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
