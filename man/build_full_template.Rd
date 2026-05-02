@@ -16,7 +16,7 @@ build_full_template(source_path, lang, code, timestamp = Sys.time())
 \item{timestamp}{POSIXct for the sentinel.}
 }
 \value{
-Character scalar — the full file contents.
+Character scalar with the full file contents.
 }
 \description{
 Build the full qmd template for a new companion file
