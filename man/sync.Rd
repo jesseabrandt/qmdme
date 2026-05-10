@@ -19,12 +19,13 @@ default \code{c(R = "r", sql = "sql", py = "python")}.}
 \value{
 Invisibly, a data frame with one row per source file with
 columns \code{source}, \code{target}, \code{action} (\code{"created"}, \code{"updated"}, or
-\code{"skipped-no-sentinel"}).
+\code{"recovered"}).
 }
 \description{
 For each source file matching \code{extensions}, writes or updates a
 corresponding \verb{qmd/<mirror>/<name>.qmd} file. Existing companion files
 have their auto-generated code section refreshed; user-authored prose
-above the sentinel is preserved. Companion files without a sentinel are
-skipped with a warning.
+above the sentinel is preserved. If a companion file is missing its
+sentinel (e.g. it was edited away), a fresh code section is appended
+to the bottom and \code{sync()} issues a warning so the user notices.
 }

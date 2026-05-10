@@ -39,18 +39,24 @@ test_that("sync updates only the code section, preserving user prose", {
   expect_true("updated" %in% out$action)
 })
 
-test_that("sync skips files without sentinel and warns", {
+test_that("sync re-appends code section and warns when sentinel is missing", {
   root <- make_project_with_sources()
   fs::dir_create(fs::path(root, "qmd", "R"))
-  writeLines(c("---", "title: \"hand-written\"", "---", "no sentinel here"),
-             fs::path(root, "qmd", "R", "fit.qmd"))
+  fit_path <- fs::path(root, "qmd", "R", "fit.qmd")
+  writeLines(c("---", "title: \"fit.R\"", "---", "",
+               "## Notes", "", "User prose without sentinel."),
+             fit_path)
 
   out <- NULL
   expect_warning(
     out <- sync(root = root),
     "no sentinel"
   )
-  expect_true("skipped-no-sentinel" %in% out$action)
+  fit <- paste(readLines(fit_path), collapse = "\n")
+  expect_match(fit, "User prose without sentinel.", fixed = TRUE)
+  expect_match(fit, "<!-- qmdme:code-below", fixed = TRUE)
+  expect_match(fit, "x <- 1", fixed = TRUE)
+  expect_true("recovered" %in% out$action)
 })
 
 test_that("sync narrows scope with paths arg", {

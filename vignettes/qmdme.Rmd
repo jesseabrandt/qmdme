@@ -68,5 +68,7 @@ Edit anything above the sentinel — add prose, headings, links — and
 re-run `sync()`. Your edits stay; the chunk below the sentinel is
 refreshed from source.
 
-If you want a fully hand-rolled file, leave out the sentinel; `sync()`
-will skip that file with a warning.
+If the sentinel is missing (for example, you accidentally deleted it),
+`sync()` re-appends a fresh code section at the bottom and warns so
+you notice the file was repaired. Companion files always end up with
+one current sentinel + chunk.

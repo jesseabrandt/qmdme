@@ -15,10 +15,21 @@ test_that("merge_with_sentinel preserves prose above sentinel", {
   expect_false(grepl("old_code", out, fixed = TRUE))
 })
 
-test_that("merge_with_sentinel returns NULL when no sentinel present", {
-  existing <- "---\ntitle: \"fit.R\"\n---\n\n## My hand-written notes\n\nNo sentinel here.\n"
-  new_section <- "<!-- qmdme:code-below new -->\n```{r}\n```\n"
-  expect_null(merge_with_sentinel(existing, new_section))
+test_that("merge_with_sentinel appends new section when sentinel is missing", {
+  existing <- "---\ntitle: \"fit.R\"\n---\n\n## Notes\n\nUser prose, no sentinel."
+  new_section <- "<!-- qmdme:code-below new -->\n\n```{r, eval=FALSE}\nx <- 1\n```\n"
+  out <- merge_with_sentinel(existing, new_section)
+  expect_match(out, "User prose, no sentinel.", fixed = TRUE)
+  expect_match(out, "<!-- qmdme:code-below new -->", fixed = TRUE)
+  expect_match(out, "x <- 1", fixed = TRUE)
+  # Original prose stays before the appended section.
+  expect_lt(regexpr("User prose", out, fixed = TRUE),
+            regexpr("qmdme:code-below", out, fixed = TRUE))
+})
+
+test_that("merge_with_sentinel handles empty existing content", {
+  new_section <- "<!-- qmdme:code-below new -->\n\n```{r, eval=FALSE}\nx <- 1\n```\n"
+  expect_equal(merge_with_sentinel("", new_section), new_section)
 })
 
 test_that("merge_with_sentinel handles sentinel as first line", {

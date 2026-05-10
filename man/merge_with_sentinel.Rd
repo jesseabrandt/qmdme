@@ -12,9 +12,11 @@ merge_with_sentinel(existing, new_section)
 \item{new_section}{New code section, including its sentinel line.}
 }
 \value{
-Merged file contents, or NULL if no sentinel was found.
+Merged file contents.
 }
 \description{
-Preserves user-authored prose above the sentinel verbatim.
+Preserves user-authored prose above the sentinel verbatim. If the sentinel
+is missing (e.g. the user deleted it), the fresh code section is appended
+to the end of the existing contents so \code{sync()} is self-healing.
 }
 \keyword{internal}
