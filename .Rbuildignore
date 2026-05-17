@@ -1,5 +1,7 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^LICENSE\.md$
+^CLAUDE\.md$
+^\.claude$
 ^vignettes/.*\.html$
 ^vignettes/.*\.R$

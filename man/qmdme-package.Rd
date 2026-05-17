@@ -11,5 +11,10 @@ Produces and updates 'eval=FALSE' Quarto companion files for source code in a re
 \author{
 \strong{Maintainer}: Jesse Brandt \email{jesse.a.brandt@gmail.com}
 
+Authors:
+\itemize{
+  \item Jesse Brandt \email{jesse.a.brandt@gmail.com}
+}
+
 }
 \keyword{internal}

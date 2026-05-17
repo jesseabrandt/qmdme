@@ -21,4 +21,8 @@ Character vector of absolute file paths.
 Walks the project tree for files matching the configured extensions,
 skipping standard ignore directories and the qmd output directory.
 }
+\details{
+\code{paths} are validated: entries that don't resolve to a directory under
+\code{root} are warned about and skipped (typos, absolute paths, \code{..}-escapes).
+}
 \keyword{internal}

@@ -4,14 +4,12 @@
 \alias{build_code_section}
 \title{Build the auto-generated section: sentinel line + fenced eval=FALSE chunk}
 \usage{
-build_code_section(lang, code, timestamp = Sys.time())
+build_code_section(lang, code)
 }
 \arguments{
 \item{lang}{Quarto chunk-language tag (e.g. "r", "sql", "python").}
 
 \item{code}{Source code string, included verbatim in the chunk.}
-
-\item{timestamp}{POSIXct used for the sentinel.}
 }
 \value{
 Character scalar.

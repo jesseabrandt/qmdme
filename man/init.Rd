@@ -15,6 +15,7 @@ Invisibly, the absolute path to the qmd directory.
 \description{
 Creates the \verb{qmd/} output directory and a stub \code{qmd/index.qmd}. Both are
 non-destructive: existing files and directories are left alone, with a
-message naming what was skipped. Prints a one-line instruction telling
-the user to wire \verb{qmd/} into their \verb{_quarto.yml} site navigation.
+message naming what was skipped and what was created. Prints a one-line
+instruction telling the user to wire \verb{qmd/} into their \verb{_quarto.yml} site
+navigation.
 }

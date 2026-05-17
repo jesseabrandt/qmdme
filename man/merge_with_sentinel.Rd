@@ -12,7 +12,10 @@ merge_with_sentinel(existing, new_section)
 \item{new_section}{New code section, including its sentinel line.}
 }
 \value{
-Merged file contents.
+List with \code{contents} (merged file contents, character scalar) and
+\code{had_sentinel} (logical: whether a line starting with the sentinel was
+found in \code{existing}). Callers use \code{had_sentinel} to discriminate the
+"updated" vs "recovered" sync actions.
 }
 \description{
 Preserves user-authored prose above the sentinel verbatim. If the sentinel

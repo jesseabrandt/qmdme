@@ -28,7 +28,7 @@ If you change the sentinel format, every existing companion in every downstream 
 ## Code map
 
 - `R/sync.R` — `sync()` (exported) and `sync_one()` (per-file driver). Returns a data frame of `source/target/action` where action ∈ `created | updated | recovered`. `sync()` warns when any row is `recovered`. The `had_sentinel` check in `sync_one()` is what discriminates `updated` vs `recovered` — `merge_with_sentinel()` itself does not signal which path it took.
-- `R/walk.R` — `walk_sources()` plus `IGNORE_DIRS` (`.git`, `renv`, `.venv`, `node_modules`, `_freeze`, `_site`, **`qmd`**). The `qmd` ignore is critical — without it sync would recurse on its own output.
+- `R/walk.R` — `walk_sources()` plus `IGNORE_DIRS` (`.git`, `.Rproj.user`, `renv`, `.venv`, `node_modules`, `_freeze`, `_site`, **`qmd`**). The `qmd` ignore is critical — without it sync would recurse on its own output. The pattern is matched against project-relative paths so an ancestor directory named like an ignore entry doesn't filter everything out.
 - `R/template.R` — `SENTINEL_PREFIX`, `build_code_section()`, `build_full_template()`. Code chunks are written as `` ```{<lang>, eval=FALSE} `` so renders never execute source.
 - `R/merge.R` — `merge_with_sentinel()`. Sentinel present → splice. Sentinel absent → append. Always returns merged contents; never `NULL`.
 - `R/extensions.R` — default extension → chunk-language map (`R→r`, `sql→sql`, `py→python`) and `chunk_lang()` lookup. Users can pass a custom mapping to `sync(extensions = ...)`.

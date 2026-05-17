@@ -4,7 +4,7 @@
 \alias{build_full_template}
 \title{Build the full qmd template for a new companion file}
 \usage{
-build_full_template(source_path, lang, code, timestamp = Sys.time())
+build_full_template(source_path, lang, code)
 }
 \arguments{
 \item{source_path}{Source file path (used for the title).}
@@ -12,8 +12,6 @@ build_full_template(source_path, lang, code, timestamp = Sys.time())
 \item{lang}{Quarto chunk-language tag.}
 
 \item{code}{Source-code body.}
-
-\item{timestamp}{POSIXct for the sentinel.}
 }
 \value{
 Character scalar with the full file contents.

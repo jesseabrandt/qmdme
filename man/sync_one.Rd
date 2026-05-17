@@ -7,6 +7,8 @@
 sync_one(source_path, extensions, root)
 }
 \description{
-Sync a single source file
+Returns a one-row result data frame, or \code{NULL} if the source resolves to
+a target that would escape \verb{<root>/qmd/} (in which case a warning is
+emitted and the file is skipped).
 }
 \keyword{internal}
