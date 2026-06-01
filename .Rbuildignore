@@ -3,5 +3,6 @@
 ^LICENSE\.md$
 ^CLAUDE\.md$
 ^\.claude$
+^scripts$
 ^vignettes/.*\.html$
 ^vignettes/.*\.R$
