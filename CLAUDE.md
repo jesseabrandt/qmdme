@@ -32,7 +32,8 @@ If you change the sentinel format, every existing companion in every downstream 
 - `R/template.R` — `SENTINEL_PREFIX`, `build_code_section()`, `build_full_template()`. Code chunks are written as `` ```{<lang>, eval=FALSE} `` so renders never execute source.
 - `R/merge.R` — `merge_with_sentinel()`. Sentinel present → splice. Sentinel absent → append. Always returns merged contents; never `NULL`.
 - `R/extensions.R` — default extension → chunk-language map (`R→r`, `sql→sql`, `py→python`) and `chunk_lang()` lookup. Users can pass a custom mapping to `sync(extensions = ...)`.
-- `R/init.R` — `init()` (exported). Non-destructive: skips existing `qmd/` and `qmd/index.qmd`. Always prints the reminder to wire `qmd/` into `_quarto.yml`.
+- `R/init.R` — `init()` (exported), takes `scope = c("embed", "website")`. Non-destructive: every seed file is skip-if-exists. `scope = "embed"` (default) writes only the `qmd/index.qmd` stub and prints the reminder to wire `qmd/` into an existing `_quarto.yml` — historical behavior, backward-compatible. `scope = "website"` scaffolds a standalone navigable Quarto site **rooted at `qmd/`** and prints a `quarto render qmd` hint instead.
+- `R/scaffold.R` — `init_files(scope)` returns a named list of `qmd/`-relative path → file-content lines that `init()` writes. Holds the `scope = "website"` builders: `build_site_quarto_yml()` (`project: type: website` + navbar + auto sidebar + **`execute: enabled: false`** so render starts no kernel — critical, since `{python}`/`{sql}` companion chunks would otherwise make Quarto boot a Jupyter kernel even though every chunk is `eval=FALSE`), `build_site_index()`, `build_site_about()`, and the embed-mode `build_embed_index()`.
 
 ## Common commands
 

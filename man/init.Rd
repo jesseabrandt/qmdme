@@ -4,18 +4,32 @@
 \alias{init}
 \title{Initialize qmdme in a project}
 \usage{
-init(path = ".")
+init(path = ".", scope = c("embed", "website"))
 }
 \arguments{
 \item{path}{Project root. Defaults to the current directory.}
+
+\item{scope}{One of \code{"embed"} (default) or \code{"website"}. See Details.}
 }
 \value{
 Invisibly, the absolute path to the qmd directory.
 }
 \description{
-Creates the \verb{qmd/} output directory and a stub \code{qmd/index.qmd}. Both are
-non-destructive: existing files and directories are left alone, with a
-message naming what was skipped and what was created. Prints a one-line
-instruction telling the user to wire \verb{qmd/} into their \verb{_quarto.yml} site
-navigation.
+Creates the \verb{qmd/} output directory and seeds it with starter files. All
+writes are non-destructive: existing files and directories are left alone,
+with a message naming what was skipped and what was created.
+}
+\details{
+Two scopes are available:
+\itemize{
+\item \code{"embed"} (default) writes only a stub \code{qmd/index.qmd}, intended to be
+wired into an \emph{existing} Quarto site's navigation. This is the historical
+behavior.
+\item \code{"website"} scaffolds a self-contained, navigable Quarto website rooted at
+\verb{qmd/} -- a \verb{qmd/_quarto.yml} (\code{project: type: website}, with a navbar and
+an auto sidebar that lists the companions), a landing \code{index.qmd}, and an
+\code{about.qmd} starter page. The synced companions become pages of the site,
+which renders on its own with \verb{quarto render qmd} and never touches a root
+\verb{_quarto.yml}.
+}
 }

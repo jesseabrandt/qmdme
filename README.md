@@ -24,4 +24,15 @@ qmdme::init()    # one-time per project
 qmdme::sync()    # whenever sources change
 ```
 
+By default `init()` seeds a single `qmd/index.qmd` stub to wire into an
+*existing* Quarto site. To instead scaffold a self-contained, navigable Quarto
+website rooted at `qmd/` (its own `_quarto.yml` with a navbar and an auto
+sidebar that lists every companion), pass `scope = "website"`:
+
+```r
+qmdme::init(scope = "website")
+qmdme::sync()
+# quarto render qmd      # builds qmd/_site
+```
+
 See `vignette("qmdme")` for the full walkthrough.
