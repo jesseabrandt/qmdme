@@ -17,8 +17,24 @@
 #'   `_quarto.yml`.
 #'
 #' @param path Project root. Defaults to the current directory.
-#' @param scope One of `"embed"` (default) or `"website"`. See Details.
+#' @param scope One of `"embed"` (default) or `"website"`. `"embed"` writes
+#'   only a `qmd/index.qmd` stub to wire into an existing Quarto site;
+#'   `"website"` additionally writes `qmd/_quarto.yml` and `qmd/about.qmd` to
+#'   make `qmd/` a standalone, navigable Quarto website. See Details.
 #' @return Invisibly, the absolute path to the qmd directory.
+#' @examples
+#' # Embed mode (default): a stub qmd/index.qmd for an existing Quarto site.
+#' demo <- file.path(tempdir(), "qmdme-embed")
+#' dir.create(demo, showWarnings = FALSE)
+#' init(demo)
+#' list.files(file.path(demo, "qmd"))
+#'
+#' # Website mode: a self-contained, navigable Quarto site rooted at qmd/.
+#' site <- file.path(tempdir(), "qmdme-site")
+#' dir.create(site, showWarnings = FALSE)
+#' init(site, scope = "website")
+#' list.files(file.path(site, "qmd"))
+#' # After qmdme::sync(), render with: quarto render qmd
 #' @export
 init <- function(path = ".", scope = c("embed", "website")) {
   scope <- match.arg(scope)

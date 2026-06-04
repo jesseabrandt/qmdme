@@ -25,7 +25,29 @@ qmdme::init()
 ```
 
 `init()` creates `qmd/` and a stub `qmd/index.qmd`, then prints an
-instruction telling you to wire `qmd/` into your `_quarto.yml`.
+instruction telling you to wire `qmd/` into your `_quarto.yml`. This default
+(`scope = "embed"`) assumes the companions ride along inside a Quarto site you
+already maintain.
+
+If you'd rather have `qmdme` build the site for you, pass `scope = "website"`:
+
+```{r}
+qmdme::init(scope = "website")
+```
+
+This scaffolds a self-contained, navigable Quarto website rooted at `qmd/`:
+
+- `qmd/_quarto.yml` — `project: type: website` with a navbar (Home / About) and
+  an auto sidebar that lists every companion `sync()` writes, so navigation
+  stays current with no manual edits. It renders to `qmd/_site` and sets
+  `execute: enabled: false`, so a render never starts a language kernel (the
+  companions are display-only `eval=FALSE` chunks).
+- `qmd/index.qmd` — a landing page.
+- `qmd/about.qmd` — a starter page describing how the companions are generated.
+
+Every seed file is skip-if-exists, so re-running `init()` never clobbers your
+edits, and `scope = "website"` never touches a `_quarto.yml` at the project
+root.
 
 ## Generating companions
 
@@ -72,3 +94,17 @@ If the sentinel is missing (for example, you accidentally deleted it),
 `sync()` re-appends a fresh code section at the bottom and warns so
 you notice the file was repaired. Companion files always end up with
 one current sentinel + chunk.
+
+## Rendering the website
+
+If you scaffolded with `init(scope = "website")`, `qmd/` is a complete Quarto
+site. After syncing, build it from the shell:
+
+```sh
+quarto render qmd
+```
+
+The rendered HTML lands in `qmd/_site`, with the landing page, the About page,
+and one page per companion, all reachable from the navbar and sidebar. Re-run
+`qmdme::sync()` whenever sources change, then `quarto render qmd` again — new
+companions appear in the sidebar automatically.

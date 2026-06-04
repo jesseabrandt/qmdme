@@ -9,7 +9,10 @@ init(path = ".", scope = c("embed", "website"))
 \arguments{
 \item{path}{Project root. Defaults to the current directory.}
 
-\item{scope}{One of \code{"embed"} (default) or \code{"website"}. See Details.}
+\item{scope}{One of \code{"embed"} (default) or \code{"website"}. \code{"embed"} writes
+only a \code{qmd/index.qmd} stub to wire into an existing Quarto site;
+\code{"website"} additionally writes \verb{qmd/_quarto.yml} and \code{qmd/about.qmd} to
+make \verb{qmd/} a standalone, navigable Quarto website. See Details.}
 }
 \value{
 Invisibly, the absolute path to the qmd directory.
@@ -32,4 +35,18 @@ an auto sidebar that lists the companions), a landing \code{index.qmd}, and an
 which renders on its own with \verb{quarto render qmd} and never touches a root
 \verb{_quarto.yml}.
 }
+}
+\examples{
+# Embed mode (default): a stub qmd/index.qmd for an existing Quarto site.
+demo <- file.path(tempdir(), "qmdme-embed")
+dir.create(demo, showWarnings = FALSE)
+init(demo)
+list.files(file.path(demo, "qmd"))
+
+# Website mode: a self-contained, navigable Quarto site rooted at qmd/.
+site <- file.path(tempdir(), "qmdme-site")
+dir.create(site, showWarnings = FALSE)
+init(site, scope = "website")
+list.files(file.path(site, "qmd"))
+# After qmdme::sync(), render with: quarto render qmd
 }
