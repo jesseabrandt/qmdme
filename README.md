@@ -20,9 +20,14 @@ remotes::install_github("jesseabrandt/qmdme")
 
 ```r
 library(qmdme)
-qmdme::init()    # one-time per project
-qmdme::sync()    # whenever sources change
+qmdme::init()    # one-time per project: scaffold qmd/
+qmdme::sync()    # whenever sources change: generate companions
+qmdme::wire()    # find out exactly how to connect qmd/ to your site
 ```
+
+`wire()` inspects the project root and tells you precisely which file and key
+to point at the `qmd/` folder — no manual YAML spelunking. If it finds no site,
+it points you at `init(scope = "website")` (below).
 
 By default `init()` seeds a single `qmd/index.qmd` stub to wire into an
 *existing* Quarto site. To instead scaffold a self-contained, navigable Quarto

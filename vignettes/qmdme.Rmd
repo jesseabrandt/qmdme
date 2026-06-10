@@ -24,10 +24,11 @@ library(qmdme)
 qmdme::init()
 ```
 
-`init()` creates `qmd/` and a stub `qmd/index.qmd`, then prints an
-instruction telling you to wire `qmd/` into your `_quarto.yml`. This default
+`init()` creates `qmd/` and a stub `qmd/index.qmd`. This default
 (`scope = "embed"`) assumes the companions ride along inside a Quarto site you
-already maintain.
+already maintain. To find out exactly how to connect `qmd/` to that site, run
+`wire()` (see [Connecting to an existing site](#connecting-to-an-existing-site)
+below).
 
 If you'd rather have `qmdme` build the site for you, pass `scope = "website"`:
 
@@ -64,6 +65,28 @@ Narrow scope by passing `paths`:
 ```{r}
 qmdme::sync(paths = "R/")
 ```
+
+## Connecting to an existing site
+
+If you already maintain a Quarto site, you don't want to go spelunking through
+YAML to find where `qmd/` plugs in. `wire()` does that for you: it looks at the
+project root, works out what kind of site you have, and tells you exactly which
+file to edit and which key to add `qmd` under.
+
+```{r}
+qmdme::wire()
+```
+
+* If it finds a root `_quarto.yml`, it prints the precise snippet to add (and
+  notes when `qmd` is already referenced, so re-running is safe).
+* If `qmd/` is already a standalone site (you used `scope = "website"`), it
+  reminds you to `quarto render qmd` -- there's nothing to wire.
+* If it finds a pkgdown or R Markdown site (which don't build from loose `.qmd`
+  files), or no site at all, it points you at `init(scope = "website")`.
+
+`wire()` is read-only -- it never edits or creates files, so it can't corrupt a
+config you maintain by hand. It also returns its findings invisibly
+(`type`, `file`, `wired`) if you want to branch on them in a script.
 
 ## Editing companions
 
