@@ -1,156 +1,137 @@
-#' Connect the `qmd/` companions to your site
+#' Connect the `qmd/` companions to your existing Quarto site
 #'
 #' After `init()` and `sync()` you have a `qmd/` directory full of companion
-#' pages. `wire()` looks at the project root, works out what kind of site (if
-#' any) you already have, and tells you exactly what to do to make the
-#' companions show up in it -- which file to edit and which key to add `qmd`
-#' under -- so you never have to go spelunking through YAML to find the spot.
+#' pages. `wire()` edits your project's root `_quarto.yml` so those companions
+#' show up in the site -- you don't have to go spelunking through YAML to find
+#' the right key.
 #'
-#' `wire()` is read-only: it inspects and reports, but never edits or creates
-#' files. Creating a site is [init()]'s job (`scope = "website"` scaffolds a
-#' standalone site rooted at `qmd/`). Wiring `qmd/` into an *existing*
-#' `_quarto.yml` is left to you on purpose -- editing a config you maintain by
-#' hand is safer than having a tool rewrite it -- but `wire()` hands you the
-#' precise snippet to paste.
+#' `wire()` edits **only when an edit is actually needed**, which keeps it
+#' honest about how Quarto works:
 #'
-#' The site types it recognizes:
+#' * If the site has an explicit sidebar `contents:` list that omits `qmd`,
+#'   `wire()` adds `qmd` to it.
+#' * If the `project:` block has an explicit `render:` allowlist that omits
+#'   `qmd`, `wire()` adds `qmd/*.qmd` to it.
+#' * If the site already surfaces `qmd` automatically -- an `auto` sidebar or no
+#'   `render:` restriction, the common minimal config -- there is nothing to do,
+#'   and `wire()` says so without touching the file.
 #'
-#' * **`"quarto"`** -- a `_quarto.yml` at the project root. `wire()` reports
-#'   whether `qmd` is already referenced and, if not, the key to add it under.
-#' * **`"qmd_website"`** -- `qmd/` is already a standalone Quarto site (a
-#'   `qmd/_quarto.yml`, e.g. from `init(scope = "website")`). Nothing to wire;
-#'   `wire()` reminds you to `quarto render qmd`.
-#' * **`"pkgdown"`** / **`"rmarkdown_site"`** -- a site that does not build from
-#'   loose `.qmd` files. `wire()` points you at `init(scope = "website")`.
-#' * **`"none"`** -- no site found. `wire()` points you at
-#'   `init(scope = "website")`.
+#' When there is no root `_quarto.yml` to edit (a standalone `qmd/` site, a
+#' pkgdown / R Markdown site, or no site at all), `wire()` does not edit
+#' anything; it explains the situation and points you at
+#' `init(scope = "website")`.
+#'
+#' **Comments and formatting.** The edit is a `yaml` read-modify-write, and the
+#' `yaml` package does not preserve comments or exact formatting. `wire()`
+#' therefore writes a `_quarto.yml.bak` backup before editing (disable with
+#' `backup = FALSE`) so your original is never lost. If your `_quarto.yml` is
+#' heavily commented, prefer to add `qmd` by hand.
 #'
 #' @param path Project root. Defaults to the current directory.
-#' @return Invisibly, a list describing what was found: `type` (one of the
-#'   strings above), `file` (the detected config file, or `NA`), and `wired`
-#'   (`TRUE` if `qmd` is already referenced by a root `_quarto.yml`). The same
-#'   guidance printed as a message, so you can branch on it programmatically.
+#' @param backup Write a `_quarto.yml.bak` copy before editing? Default `TRUE`.
+#' @return Invisibly, a list: `type` (the detected site type), `file` (the
+#'   config edited or inspected, or `NA`), `changed` (`TRUE` if `wire()` wrote a
+#'   change), and `backup` (path to the backup written, or `NA`).
 #' @examples
-#' # A project with an existing Quarto site:
 #' proj <- file.path(tempdir(), "qmdme-wire")
 #' dir.create(proj, showWarnings = FALSE)
-#' writeLines(c("project:", "  type: website"),
+#' writeLines(c("project:", "  type: website", "website:", "  sidebar:",
+#'              "    contents:", "      - index.qmd"),
 #'            file.path(proj, "_quarto.yml"))
 #' wire(proj)
-#'
-#' # No site yet -> pointed at website mode:
-#' bare <- file.path(tempdir(), "qmdme-wire-bare")
-#' dir.create(bare, showWarnings = FALSE)
-#' wire(bare)
+#' readLines(file.path(proj, "_quarto.yml"))
 #' @seealso [init()] to scaffold `qmd/`, [sync()] to generate companions.
 #' @export
-wire <- function(path = ".") {
+wire <- function(path = ".", backup = TRUE) {
   site <- detect_site(path)
-  for (line in site$guidance) message(line)
-  invisible(site[c("type", "file", "wired")])
+
+  if (site$type != "quarto") {
+    for (line in init_site_guidance(site)) message(line)
+    return(invisible(wire_result(site$type, site$file, FALSE, NA_character_)))
+  }
+
+  edit <- plan_quarto_edit(site$file)
+  if (!edit$changed) {
+    message(edit$message)
+    return(invisible(wire_result("quarto", site$file, FALSE, NA_character_)))
+  }
+
+  bak <- NA_character_
+  if (backup) {
+    bak <- paste0(site$file, ".bak")
+    fs::file_copy(site$file, bak, overwrite = TRUE)
+  }
+  yaml::write_yaml(edit$yml, site$file)
+  message(edit$message,
+          if (backup) sprintf(" (backup: %s)", fs::path_file(bak)) else "",
+          "\nNote: writing the config drops YAML comments and reformats it",
+          if (backup) "; the original is in the .bak file." else ".")
+  invisible(wire_result("quarto", site$file, TRUE, bak))
 }
 
-#' Inspect the project root and describe how to connect `qmd/` to its site
+#' @keywords internal
+wire_result <- function(type, file, changed, backup) {
+  list(type = type, file = as.character(file), changed = changed,
+       backup = as.character(backup))
+}
+
+#' Work out whether and how to edit a root `_quarto.yml`
 #'
-#' Returns a list with `type`, `file`, `wired`, and `guidance` (a character
-#' vector of message lines). Pure: reads files but never writes. See [wire()]
-#' for the recognized site types.
+#' Parses the config and returns a list with `changed` (logical), the modified
+#' `yml` (when `changed`), and a human-readable `message`. Pure: decides the
+#' edit but does not write it. See [wire()] for the rules.
 #' @keywords internal
-detect_site <- function(path) {
-  root_quarto <- fs::path(path, "_quarto.yml")
-  qmd_quarto  <- fs::path(path, "qmd", "_quarto.yml")
+plan_quarto_edit <- function(quarto_yml) {
+  if (quarto_references_qmd(quarto_yml)) {
+    return(list(changed = FALSE, yml = NULL,
+                message = "`qmd` is already referenced in _quarto.yml -- nothing to change."))
+  }
 
-  if (fs::file_exists(root_quarto)) {
-    wired <- quarto_references_qmd(root_quarto)
-    return(site_result("quarto", root_quarto, wired,
-                       guidance_quarto(root_quarto, wired)))
+  yml <- yaml::read_yaml(quarto_yml)
+  changed <- FALSE
+  did <- character(0)
+
+  # 1. Explicit sidebar contents list that omits qmd -> add it. `contents: auto`
+  # is Quarto's "list every page yourself? no, auto-generate" keyword, so the
+  # companions already appear -- leave it alone.
+  contents <- yml[["website"]][["sidebar"]][["contents"]]
+  if (is_simple_list(contents) && !identical(as.character(contents), "auto")) {
+    yml[["website"]][["sidebar"]][["contents"]] <-
+      c(as.list(contents), "qmd")
+    changed <- TRUE
+    did <- c(did, "the sidebar")
   }
-  if (fs::file_exists(qmd_quarto)) {
-    return(site_result("qmd_website", qmd_quarto, FALSE,
-                       guidance_qmd_website()))
+
+  # 2. Explicit project render allowlist that omits qmd -> add it.
+  render <- yml[["project"]][["render"]]
+  if (is_simple_list(render)) {
+    yml[["project"]][["render"]] <- c(as.list(render), "qmd/*.qmd")
+    changed <- TRUE
+    did <- c(did, "the render list")
   }
-  pkgdown <- fs::path(path, "_pkgdown.yml")
-  if (fs::file_exists(pkgdown)) {
-    return(site_result("pkgdown", pkgdown, FALSE,
-                       guidance_other("pkgdown", pkgdown)))
+
+  if (!changed) {
+    return(list(changed = FALSE, yml = NULL,
+                message = paste0(
+                  "Your site already surfaces `qmd` automatically (auto ",
+                  "sidebar / no render restriction) -- nothing to change. ",
+                  "Run `quarto render`.")))
   }
-  rmd_site <- fs::path(path, "_site.yml")
-  if (fs::file_exists(rmd_site)) {
-    return(site_result("rmarkdown_site", rmd_site, FALSE,
-                       guidance_other("R Markdown", rmd_site)))
-  }
-  site_result("none", NA_character_, FALSE, guidance_none())
+  list(changed = TRUE, yml = yml,
+       message = sprintf("Added `qmd` to %s in _quarto.yml.",
+                         paste(did, collapse = " and ")))
 }
 
-#' Assemble a `detect_site()` result list
-#' @keywords internal
-site_result <- function(type, file, wired, guidance) {
-  list(type = type, file = as.character(file), wired = wired,
-       guidance = guidance)
-}
-
-#' Does a root `_quarto.yml` already reference the `qmd` directory?
+#' Is `x` a flat list/vector of scalars (a YAML sequence we can append to)?
 #'
-#' A deliberately loose check: any line mentioning `qmd` as a path token
-#' (`- qmd`, `qmd/`, `qmd/index.qmd`, ...) counts. Over-matching only makes
-#' `wire()` say "already wired" when it might not be -- a benign nudge, not a
-#' destructive action -- so the cheap heuristic is the right trade.
+#' `yaml::read_yaml` returns a sequence of scalars as a character vector or a
+#' list of length-1 atoms. A sequence containing maps (nested `section:` /
+#' `contents:` structures) comes back as a list with non-scalar elements -- we
+#' leave those alone rather than risk mangling a hand-built nav tree.
 #' @keywords internal
-quarto_references_qmd <- function(quarto_yml) {
-  lines <- readLines(quarto_yml, warn = FALSE)
-  any(grepl("(^|[^[:alnum:]_])qmd($|[^[:alnum:]_])", lines))
-}
-
-#' Guidance lines for a root `_quarto.yml`
-#' @keywords internal
-guidance_quarto <- function(file, wired) {
-  rel <- fs::path_file(file)
-  if (wired) {
-    return(c(
-      sprintf("Found a Quarto site (%s) that already references `qmd`.", rel),
-      "You're set -- run `quarto render` to rebuild it."
-    ))
-  }
-  c(
-    sprintf("Found a Quarto site: %s", rel),
-    "Add `qmd` so the companions appear in it. For a sidebar, put this under",
-    "the `website:` key:",
-    "",
-    "  sidebar:",
-    "    contents:",
-    "      - qmd",
-    "",
-    "(If your `project:` sets an explicit `render:` list, add `- qmd` there",
-    "too.) Then run `quarto render`."
-  )
-}
-
-#' Guidance lines for an existing standalone `qmd/` website
-#' @keywords internal
-guidance_qmd_website <- function() {
-  c(
-    "`qmd/` is already a standalone Quarto site (qmd/_quarto.yml).",
-    "Nothing to wire -- run `quarto render qmd` to build it."
-  )
-}
-
-#' Guidance lines for a non-Quarto site (pkgdown / R Markdown)
-#' @keywords internal
-guidance_other <- function(kind, file) {
-  rel <- fs::path_file(file)
-  c(
-    sprintf("Found a %s site (%s), which doesn't build from loose `.qmd`", kind, rel),
-    "files. To publish the companions as their own site, run",
-    "`qmdme::init(scope = \"website\")` for a standalone site rooted at `qmd/`."
-  )
-}
-
-#' Guidance lines when no site is found
-#' @keywords internal
-guidance_none <- function() {
-  c(
-    "No website found at the project root.",
-    "Run `qmdme::init(scope = \"website\")` to make `qmd/` a standalone,",
-    "navigable Quarto site."
-  )
+is_simple_list <- function(x) {
+  if (is.null(x)) return(FALSE)
+  if (is.character(x) && length(x) >= 1) return(TRUE)
+  is.list(x) && length(x) >= 1 &&
+    all(vapply(x, function(e) is.atomic(e) && length(e) == 1, logical(1)))
 }

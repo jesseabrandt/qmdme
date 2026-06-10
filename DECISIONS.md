@@ -28,3 +28,13 @@ See `~/workspace/docs/decision-log.md` for the convention.
 - **Choice:** Added ^DECISIONS\.md$ to .Rbuildignore
 - **Why:** DECISIONS.md is workspace governance, not package content; it tripped a single R CMD check NOTE (non-standard top-level file). Ignoring it keeps check at 0/0/0.
 - **Reversible:** yes · **Decided by:** agent
+
+## 2026-06-10 — wire() becomes a doer: yaml read-modify-write with backup
+- **Choice:** Reworked per Jesse's PR#2 correction. wire() (was read-only) now EDITS the root _quarto.yml to add qmd to website.sidebar.contents and project.render (when those are explicit lists), via yaml read_yaml/write_yaml round-trip; writes _quarto.yml.bak first (backup=TRUE default). Detection stays on lightweight readLines/grep; yaml used only for the edit. Added yaml to Imports (Jesse pre-verified installed).
+- **Why:** Jesse: 'wire should make edits ... if we do export wire() it should make the changes.' yaml round-trip is robust across YAML shapes where textual insertion is fragile; cost is dropped comments, mitigated by default backup + honest messaging. Comment-dropping flagged in PR per Jesse's instruction.
+- **Reversible:** yes · **Decided by:** agent
+
+## 2026-06-10 — init() auto-detects site and instructs; sync() warns suppressibly
+- **Choice:** Auto-detect + exact instructions moved into init() (embed mode prints a detection-driven next-step: run wire() for a quarto site, init(scope=website) for none/pkgdown). sync() gains warn_no_site = getOption('qmdme.warn_no_site', TRUE) and fires a suppressible warning when companions aren't connected to a site. detect_site()+guidance moved to R/detect.R, shared by init/sync/wire.
+- **Why:** Jesse: 'auto-detect/instructions should happen on init(); possibly also fire a warning on sync() which user should be able to turn off.' Single option-backed arg serves both per-call and global off-switch, idiomatic R.
+- **Reversible:** yes · **Decided by:** agent

@@ -2,59 +2,58 @@
 % Please edit documentation in R/wire.R
 \name{wire}
 \alias{wire}
-\title{Connect the \verb{qmd/} companions to your site}
+\title{Connect the \verb{qmd/} companions to your existing Quarto site}
 \usage{
-wire(path = ".")
+wire(path = ".", backup = TRUE)
 }
 \arguments{
 \item{path}{Project root. Defaults to the current directory.}
+
+\item{backup}{Write a \verb{_quarto.yml.bak} copy before editing? Default \code{TRUE}.}
 }
 \value{
-Invisibly, a list describing what was found: \code{type} (one of the
-strings above), \code{file} (the detected config file, or \code{NA}), and \code{wired}
-(\code{TRUE} if \code{qmd} is already referenced by a root \verb{_quarto.yml}). The same
-guidance printed as a message, so you can branch on it programmatically.
+Invisibly, a list: \code{type} (the detected site type), \code{file} (the
+config edited or inspected, or \code{NA}), \code{changed} (\code{TRUE} if \code{wire()} wrote a
+change), and \code{backup} (path to the backup written, or \code{NA}).
 }
 \description{
 After \code{init()} and \code{sync()} you have a \verb{qmd/} directory full of companion
-pages. \code{wire()} looks at the project root, works out what kind of site (if
-any) you already have, and tells you exactly what to do to make the
-companions show up in it -- which file to edit and which key to add \code{qmd}
-under -- so you never have to go spelunking through YAML to find the spot.
+pages. \code{wire()} edits your project's root \verb{_quarto.yml} so those companions
+show up in the site -- you don't have to go spelunking through YAML to find
+the right key.
 }
 \details{
-\code{wire()} is read-only: it inspects and reports, but never edits or creates
-files. Creating a site is \code{\link[=init]{init()}}'s job (\code{scope = "website"} scaffolds a
-standalone site rooted at \verb{qmd/}). Wiring \verb{qmd/} into an \emph{existing}
-\verb{_quarto.yml} is left to you on purpose -- editing a config you maintain by
-hand is safer than having a tool rewrite it -- but \code{wire()} hands you the
-precise snippet to paste.
-
-The site types it recognizes:
+\code{wire()} edits \strong{only when an edit is actually needed}, which keeps it
+honest about how Quarto works:
 \itemize{
-\item \strong{\code{"quarto"}} -- a \verb{_quarto.yml} at the project root. \code{wire()} reports
-whether \code{qmd} is already referenced and, if not, the key to add it under.
-\item \strong{\code{"qmd_website"}} -- \verb{qmd/} is already a standalone Quarto site (a
-\verb{qmd/_quarto.yml}, e.g. from \code{init(scope = "website")}). Nothing to wire;
-\code{wire()} reminds you to \verb{quarto render qmd}.
-\item \strong{\code{"pkgdown"}} / \strong{\code{"rmarkdown_site"}} -- a site that does not build from
-loose \code{.qmd} files. \code{wire()} points you at \code{init(scope = "website")}.
-\item \strong{\code{"none"}} -- no site found. \code{wire()} points you at
-\code{init(scope = "website")}.
+\item If the site has an explicit sidebar \verb{contents:} list that omits \code{qmd},
+\code{wire()} adds \code{qmd} to it.
+\item If the \verb{project:} block has an explicit \verb{render:} allowlist that omits
+\code{qmd}, \code{wire()} adds \verb{qmd/*.qmd} to it.
+\item If the site already surfaces \code{qmd} automatically -- an \code{auto} sidebar or no
+\verb{render:} restriction, the common minimal config -- there is nothing to do,
+and \code{wire()} says so without touching the file.
 }
+
+When there is no root \verb{_quarto.yml} to edit (a standalone \verb{qmd/} site, a
+pkgdown / R Markdown site, or no site at all), \code{wire()} does not edit
+anything; it explains the situation and points you at
+\code{init(scope = "website")}.
+
+\strong{Comments and formatting.} The edit is a \code{yaml} read-modify-write, and the
+\code{yaml} package does not preserve comments or exact formatting. \code{wire()}
+therefore writes a \verb{_quarto.yml.bak} backup before editing (disable with
+\code{backup = FALSE}) so your original is never lost. If your \verb{_quarto.yml} is
+heavily commented, prefer to add \code{qmd} by hand.
 }
 \examples{
-# A project with an existing Quarto site:
 proj <- file.path(tempdir(), "qmdme-wire")
 dir.create(proj, showWarnings = FALSE)
-writeLines(c("project:", "  type: website"),
+writeLines(c("project:", "  type: website", "website:", "  sidebar:",
+             "    contents:", "      - index.qmd"),
            file.path(proj, "_quarto.yml"))
 wire(proj)
-
-# No site yet -> pointed at website mode:
-bare <- file.path(tempdir(), "qmdme-wire-bare")
-dir.create(bare, showWarnings = FALSE)
-wire(bare)
+readLines(file.path(proj, "_quarto.yml"))
 }
 \seealso{
 \code{\link[=init]{init()}} to scaffold \verb{qmd/}, \code{\link[=sync]{sync()}} to generate companions.

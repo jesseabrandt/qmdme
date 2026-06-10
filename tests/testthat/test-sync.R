@@ -1,3 +1,8 @@
+# These tests exercise sync()'s file mechanics, not site wiring, so silence the
+# "not connected to a site" warning for the whole file. The warning has its own
+# coverage in test-detect.R.
+withr::local_options(qmdme.warn_no_site = FALSE, .local_envir = teardown_env())
+
 # Stable per-file content hash used by the idempotency test.
 digest_file <- function(path) {
   paste(tools::md5sum(path), collapse = "")

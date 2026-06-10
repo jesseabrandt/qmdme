@@ -75,8 +75,7 @@ init <- function(path = ".", scope = c("embed", "website")) {
     message("`qmd/` is a standalone Quarto website. ",
             "Run `quarto render qmd` to build it.")
   } else {
-    message("Next: run `qmdme::wire()` to connect `qmd/` to your site ",
-            "(it finds your `_quarto.yml` and tells you exactly what to add).")
+    for (line in init_site_guidance(detect_site(path))) message(line)
   }
   invisible(qmd_dir)
 }

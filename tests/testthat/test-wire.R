@@ -1,86 +1,198 @@
-# wire() detects an existing site and tells the user exactly how to connect
-# qmd/ to it, or points at website mode when there is no site. It is read-only:
-# it never edits or creates files (creation is init(scope = "website")'s job).
+# wire() is a DOER: it edits the root _quarto.yml so the qmd/ companions are
+# wired into the site. It only edits when an edit is actually needed (an
+# explicit sidebar `contents:` list or a `project: render:` allowlist that
+# excludes qmd); when the site already surfaces qmd automatically it reports so
+# and changes nothing. It backs the file up before writing.
 
-test_that("wire() detects a root _quarto.yml and names the file", {
+test_that("wire() adds qmd to an explicit sidebar contents list", {
   root <- withr::local_tempdir()
-  writeLines(c("project:", "  type: website"),
-             fs::path(root, "_quarto.yml"))
-  expect_message(wire(root), "_quarto.yml", fixed = TRUE)
+  writeLines(c(
+    "project:",
+    "  type: website",
+    "website:",
+    "  sidebar:",
+    "    contents:",
+    "      - index.qmd",
+    "      - about.qmd"
+  ), fs::path(root, "_quarto.yml"))
+
   res <- suppressMessages(wire(root))
+
   expect_equal(res$type, "quarto")
-  expect_false(res$wired)
-  expect_equal(as.character(fs::path_file(res$file)), "_quarto.yml")
+  expect_true(res$changed)
+  yml <- yaml::read_yaml(fs::path(root, "_quarto.yml"))
+  expect_true("qmd" %in% unlist(yml$website$sidebar$contents))
 })
 
-test_that("wire() guidance names a concrete key to add qmd under", {
+test_that("wire() backs up the config before editing (backup = TRUE)", {
   root <- withr::local_tempdir()
-  writeLines(c("project:", "  type: website"),
-             fs::path(root, "_quarto.yml"))
-  # The instruction must be actionable: it should mention 'qmd' and a YAML key
-  # the user adds it under (contents/sidebar/render), not a vague "wire it in".
-  expect_message(wire(root), "qmd", fixed = TRUE)
-  expect_message(wire(root), "contents|sidebar|render")
+  original <- c(
+    "project:",
+    "  type: website",
+    "website:",
+    "  sidebar:",
+    "    contents:",
+    "      - index.qmd"
+  )
+  writeLines(original, fs::path(root, "_quarto.yml"))
+
+  res <- suppressMessages(wire(root))
+
+  expect_true(res$changed)
+  bak <- fs::path(root, "_quarto.yml.bak")
+  expect_true(fs::file_exists(bak))
+  # The backup is the verbatim pre-edit file.
+  expect_equal(readLines(bak), original)
 })
 
-test_that("wire() recognizes when qmd is already referenced", {
+test_that("wire(backup = FALSE) edits without writing a .bak", {
   root <- withr::local_tempdir()
-  writeLines(c("project:", "  type: website",
-               "website:", "  sidebar:", "    contents:", "      - qmd"),
-             fs::path(root, "_quarto.yml"))
+  writeLines(c(
+    "project:",
+    "  type: website",
+    "website:",
+    "  sidebar:",
+    "    contents:",
+    "      - index.qmd"
+  ), fs::path(root, "_quarto.yml"))
+
+  suppressMessages(wire(root, backup = FALSE))
+
+  expect_false(fs::file_exists(fs::path(root, "_quarto.yml.bak")))
+  yml <- yaml::read_yaml(fs::path(root, "_quarto.yml"))
+  expect_true("qmd" %in% unlist(yml$website$sidebar$contents))
+})
+
+test_that("wire() is idempotent: re-running makes no further change", {
+  root <- withr::local_tempdir()
+  writeLines(c(
+    "project:",
+    "  type: website",
+    "website:",
+    "  sidebar:",
+    "    contents:",
+    "      - index.qmd"
+  ), fs::path(root, "_quarto.yml"))
+
+  suppressMessages(wire(root))
+  res2 <- suppressMessages(wire(root))
+
+  expect_false(res2$changed)
+  expect_message(wire(root), "already")
+  yml <- yaml::read_yaml(fs::path(root, "_quarto.yml"))
+  expect_equal(sum(unlist(yml$website$sidebar$contents) == "qmd"), 1L)
+})
+
+test_that("wire() adds qmd to an explicit project render allowlist", {
+  root <- withr::local_tempdir()
+  writeLines(c(
+    "project:",
+    "  type: website",
+    "  render:",
+    "    - index.qmd",
+    "    - about.qmd"
+  ), fs::path(root, "_quarto.yml"))
+
   res <- suppressMessages(wire(root))
-  expect_equal(res$type, "quarto")
-  expect_true(res$wired)
+
+  expect_true(res$changed)
+  yml <- yaml::read_yaml(fs::path(root, "_quarto.yml"))
+  expect_true(any(grepl("qmd", unlist(yml$project$render))))
+})
+
+test_that("wire() makes no edit when the site already surfaces qmd automatically", {
+  root <- withr::local_tempdir()
+  # Minimal site: auto sidebar, no render allowlist -> qmd appears on its own.
+  writeLines(c(
+    "project:",
+    "  type: website",
+    "website:",
+    "  sidebar:",
+    "    contents: auto"
+  ), fs::path(root, "_quarto.yml"))
+  before <- readLines(fs::path(root, "_quarto.yml"))
+
+  res <- suppressMessages(wire(root))
+
+  expect_false(res$changed)
+  expect_equal(readLines(fs::path(root, "_quarto.yml")), before)
+  expect_false(fs::file_exists(fs::path(root, "_quarto.yml.bak")))
+  expect_message(wire(root), "automatically")
+})
+
+test_that("wire() makes no edit when qmd is already in the contents list", {
+  root <- withr::local_tempdir()
+  writeLines(c(
+    "project:",
+    "  type: website",
+    "website:",
+    "  sidebar:",
+    "    contents:",
+    "      - index.qmd",
+    "      - qmd"
+  ), fs::path(root, "_quarto.yml"))
+  before <- readLines(fs::path(root, "_quarto.yml"))
+
+  res <- suppressMessages(wire(root))
+
+  expect_false(res$changed)
+  expect_equal(readLines(fs::path(root, "_quarto.yml")), before)
   expect_message(wire(root), "already")
 })
 
-test_that("wire() recognizes an existing standalone qmd/ website", {
+test_that("wire() does not edit; it guides, when there is no root Quarto site", {
+  root <- withr::local_tempdir()
+  res <- suppressMessages(wire(root))
+  expect_equal(res$type, "none")
+  expect_false(res$changed)
+  expect_message(wire(root), "scope = \"website\"", fixed = TRUE)
+})
+
+test_that("wire() guides (no edit) for a standalone qmd/ website", {
   root <- withr::local_tempdir()
   fs::dir_create(fs::path(root, "qmd"))
   writeLines(c("project:", "  type: website"),
              fs::path(root, "qmd", "_quarto.yml"))
   res <- suppressMessages(wire(root))
   expect_equal(res$type, "qmd_website")
-  expect_message(wire(root), "quarto render qmd")
+  expect_false(res$changed)
+  expect_message(wire(root), "quarto render qmd", fixed = TRUE)
 })
 
-test_that("wire() recognizes a pkgdown site and points elsewhere", {
+test_that("wire() guides (no edit) for a pkgdown site", {
   root <- withr::local_tempdir()
   writeLines("url: https://example.org", fs::path(root, "_pkgdown.yml"))
   res <- suppressMessages(wire(root))
   expect_equal(res$type, "pkgdown")
+  expect_false(res$changed)
   expect_message(wire(root), "website", fixed = TRUE)
 })
 
-test_that("wire() points at website mode when no site is found", {
-  root <- withr::local_tempdir()
-  res <- suppressMessages(wire(root))
-  expect_equal(res$type, "none")
-  expect_message(wire(root), "scope = \"website\"", fixed = TRUE)
-})
-
-test_that("wire() returns its detection result invisibly", {
+test_that("wire() returns its result invisibly", {
   root <- withr::local_tempdir()
   expect_invisible(suppressMessages(wire(root)))
   res <- suppressMessages(wire(root))
   expect_type(res, "list")
-  expect_true(all(c("type", "file", "wired") %in% names(res)))
+  expect_true(all(c("type", "file", "changed") %in% names(res)))
 })
 
-test_that("wire() does not create or modify any files", {
+test_that("wire() leaves an unrecognized config untouched and guides", {
   root <- withr::local_tempdir()
-  writeLines(c("project:", "  type: website"),
-             fs::path(root, "_quarto.yml"))
-  before <- fs::dir_ls(root, recurse = TRUE)
-  before_yml <- readLines(fs::path(root, "_quarto.yml"))
-  suppressMessages(wire(root))
-  after <- fs::dir_ls(root, recurse = TRUE)
-  after_yml <- readLines(fs::path(root, "_quarto.yml"))
-  expect_equal(as.character(after), as.character(before))
-  expect_equal(after_yml, before_yml)
-})
+  # A sidebar whose contents is a nested section structure we don't rewrite.
+  writeLines(c(
+    "project:",
+    "  type: website",
+    "website:",
+    "  sidebar:",
+    "    contents:",
+    "      - section: Reference",
+    "        contents:",
+    "          - index.qmd"
+  ), fs::path(root, "_quarto.yml"))
+  before <- readLines(fs::path(root, "_quarto.yml"))
 
-test_that("init() embed mode points the user at wire()", {
-  root <- withr::local_tempdir()
-  expect_message(init(root), "wire", fixed = TRUE)
+  res <- suppressMessages(wire(root))
+
+  expect_false(res$changed)
+  expect_equal(readLines(fs::path(root, "_quarto.yml")), before)
 })
