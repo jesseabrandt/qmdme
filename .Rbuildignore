@@ -6,3 +6,6 @@
 ^scripts$
 ^vignettes/.*\.html$
 ^vignettes/.*\.R$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
