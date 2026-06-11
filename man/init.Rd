@@ -50,3 +50,7 @@ init(site, scope = "website")
 list.files(file.path(site, "qmd"))
 # After qmdme::sync(), render with: quarto render qmd
 }
+\seealso{
+\code{\link[=wire]{wire()}} to connect \verb{qmd/} to an existing site, \code{\link[=sync]{sync()}} to
+generate companions.
+}

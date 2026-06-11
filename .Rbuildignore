@@ -2,6 +2,7 @@
 ^\.Rproj\.user$
 ^LICENSE\.md$
 ^CLAUDE\.md$
+^DECISIONS\.md$
 ^\.claude$
 ^scripts$
 ^vignettes/.*\.html$

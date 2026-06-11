@@ -13,11 +13,17 @@
 #'   Quarto chunk-language tag, or `NULL` (default) to use the package
 #'   default `c(R = "r", sql = "sql", py = "python")`.
 #' @param root Project root. Defaults to the current directory.
+#' @param warn_no_site Warn when the companions aren't connected to a site
+#'   (no `_quarto.yml` references `qmd/`, or there is no site at all)? Defaults
+#'   to the `qmdme.warn_no_site` option, or `TRUE`. Set
+#'   `options(qmdme.warn_no_site = FALSE)` to silence it for good (e.g. when you
+#'   deliberately don't want a site), or pass `FALSE` for a single call.
 #' @return Invisibly, a data frame with one row per source file with
 #'   columns `source`, `target`, `action` (`"created"`, `"updated"`, or
 #'   `"recovered"`).
 #' @export
-sync <- function(paths = NULL, extensions = NULL, root = ".") {
+sync <- function(paths = NULL, extensions = NULL, root = ".",
+                 warn_no_site = getOption("qmdme.warn_no_site", TRUE)) {
   if (is.null(extensions)) extensions <- qmdme_default_extensions()
   files <- walk_sources(root, paths, extensions)
   if (length(files) == 0) {
@@ -34,6 +40,14 @@ sync <- function(paths = NULL, extensions = NULL, root = ".") {
     warning("Re-appended code section in ", nrow(recovered),
             " file(s) with no sentinel:\n  - ",
             paste(recovered$target, collapse = "\n  - "), call. = FALSE)
+  }
+  if (warn_no_site && !site_connected(detect_site(root))) {
+    warning("Wrote ", nrow(result), " companion(s) to qmd/, but they aren't ",
+            "connected to a site yet.\n",
+            "Run `qmdme::wire()` to add them to an existing `_quarto.yml`, or ",
+            "`qmdme::init(scope = \"website\")` to scaffold one.\n",
+            "Silence this with `options(qmdme.warn_no_site = FALSE)`.",
+            call. = FALSE)
   }
   invisible(result)
 }

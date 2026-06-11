@@ -22,6 +22,8 @@
 #'   `"website"` additionally writes `qmd/_quarto.yml` and `qmd/about.qmd` to
 #'   make `qmd/` a standalone, navigable Quarto website. See Details.
 #' @return Invisibly, the absolute path to the qmd directory.
+#' @seealso [wire()] to connect `qmd/` to an existing site, [sync()] to
+#'   generate companions.
 #' @examples
 #' # Embed mode (default): a stub qmd/index.qmd for an existing Quarto site.
 #' demo <- file.path(tempdir(), "qmdme-embed")
@@ -73,7 +75,7 @@ init <- function(path = ".", scope = c("embed", "website")) {
     message("`qmd/` is a standalone Quarto website. ",
             "Run `quarto render qmd` to build it.")
   } else {
-    message("Add `qmd/` to your `_quarto.yml` site navigation.")
+    for (line in init_site_guidance(detect_site(path))) message(line)
   }
   invisible(qmd_dir)
 }

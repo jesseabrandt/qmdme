@@ -24,10 +24,12 @@ library(qmdme)
 qmdme::init()
 ```
 
-`init()` creates `qmd/` and a stub `qmd/index.qmd`, then prints an
-instruction telling you to wire `qmd/` into your `_quarto.yml`. This default
+`init()` creates `qmd/` and a stub `qmd/index.qmd`. This default
 (`scope = "embed"`) assumes the companions ride along inside a Quarto site you
-already maintain.
+already maintain, so `init()` looks at your project root, works out what kind of
+site you have, and tells you the next step — typically "run `qmdme::wire()` to
+connect `qmd/` to it" (see
+[Connecting to an existing site](#connecting-to-an-existing-site) below).
 
 If you'd rather have `qmdme` build the site for you, pass `scope = "website"`:
 
@@ -64,6 +66,40 @@ Narrow scope by passing `paths`:
 ```{r}
 qmdme::sync(paths = "R/")
 ```
+
+## Connecting to an existing site
+
+If you already maintain a Quarto site, you don't want to go spelunking through
+YAML to find where `qmd/` plugs in. `wire()` does the edit for you: it looks at
+the project root and, when an edit is needed, points your root `_quarto.yml` at
+the `qmd/` folder.
+
+```{r}
+qmdme::wire()
+```
+
+`wire()` edits **only when it has to**, which keeps it honest about how Quarto
+works:
+
+* If the site has an explicit sidebar `contents:` list that omits `qmd`,
+  `wire()` adds `qmd` to it. Same for an explicit `project: render:` allowlist.
+* If the site already surfaces `qmd` automatically — an `auto` sidebar or no
+  `render:` restriction, which is the common minimal config — there's nothing to
+  do, and `wire()` says so without touching the file.
+* If `qmd/` is already a standalone site (you used `scope = "website"`), or the
+  site is pkgdown / R Markdown, or there's no site at all, `wire()` doesn't edit
+  anything; it explains and points you at `init(scope = "website")`.
+
+Because the edit is a `yaml` read-modify-write, it does not preserve comments or
+exact formatting in your `_quarto.yml`. `wire()` therefore backs the file up to
+`_quarto.yml.bak` before editing (pass `backup = FALSE` to skip), and if your
+config is heavily commented you may prefer to add `qmd` by hand. `wire()`
+returns its result invisibly (`type`, `file`, `changed`, `backup`) so you can
+branch on it in a script.
+
+`sync()` will also remind you, with a warning, when the companions aren't
+connected to a site yet. If you don't want a site, silence it with
+`options(qmdme.warn_no_site = FALSE)` or `sync(warn_no_site = FALSE)`.
 
 ## Editing companions
 

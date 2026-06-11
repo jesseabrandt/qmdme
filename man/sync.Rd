@@ -4,7 +4,12 @@
 \alias{sync}
 \title{Generate or update Quarto code companions for source files}
 \usage{
-sync(paths = NULL, extensions = NULL, root = ".")
+sync(
+  paths = NULL,
+  extensions = NULL,
+  root = ".",
+  warn_no_site = getOption("qmdme.warn_no_site", TRUE)
+)
 }
 \arguments{
 \item{paths}{Character vector of paths under \code{root} to narrow scope, or
@@ -15,6 +20,12 @@ Quarto chunk-language tag, or \code{NULL} (default) to use the package
 default \code{c(R = "r", sql = "sql", py = "python")}.}
 
 \item{root}{Project root. Defaults to the current directory.}
+
+\item{warn_no_site}{Warn when the companions aren't connected to a site
+(no \verb{_quarto.yml} references \verb{qmd/}, or there is no site at all)? Defaults
+to the \code{qmdme.warn_no_site} option, or \code{TRUE}. Set
+\code{options(qmdme.warn_no_site = FALSE)} to silence it for good (e.g. when you
+deliberately don't want a site), or pass \code{FALSE} for a single call.}
 }
 \value{
 Invisibly, a data frame with one row per source file with
