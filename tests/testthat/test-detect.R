@@ -30,6 +30,57 @@ test_that("detect_site() classifies the common site types", {
   expect_equal(detect_site(bare)$type, "none")
 })
 
+test_that("detect_site() is not fooled by qmd appearing in a comment", {
+  root <- withr::local_tempdir()
+  writeLines(c("project:", "  type: website",
+               "website:", "  sidebar:", "    contents:",
+               "      - index.qmd", "      # - qmd  (add this later)"),
+             fs::path(root, "_quarto.yml"))
+  expect_false(detect_site(root)$wired)
+})
+
+test_that("detect_site() is not fooled by a hyphenated name with a qmd segment", {
+  root <- withr::local_tempdir()
+  writeLines(c("project:", "  type: website", "  render:",
+               "    - analysis-qmd-v2.R"),
+             fs::path(root, "_quarto.yml"))
+  expect_false(detect_site(root)$wired)
+})
+
+test_that("detect_site() is not fooled by qmd as a mapping value (output-dir)", {
+  root <- withr::local_tempdir()
+  writeLines(c("project:", "  type: website", "  output-dir: qmd"),
+             fs::path(root, "_quarto.yml"))
+  expect_false(detect_site(root)$wired)
+})
+
+test_that("detect_site() still recognizes a genuine qmd reference", {
+  # bare list item
+  block <- withr::local_tempdir()
+  writeLines(c("website:", "  sidebar:", "    contents:", "      - qmd"),
+             fs::path(block, "_quarto.yml"))
+  expect_true(detect_site(block)$wired)
+
+  # qmd/ path glob in a render allowlist
+  glob <- withr::local_tempdir()
+  writeLines(c("project:", "  render:", "    - index.qmd", "    - qmd/*.qmd"),
+             fs::path(glob, "_quarto.yml"))
+  expect_true(detect_site(glob)$wired)
+
+  # inline flow sequence
+  flow <- withr::local_tempdir()
+  writeLines(c("website:", "  sidebar:", "    contents: [index.qmd, qmd]"),
+             fs::path(flow, "_quarto.yml"))
+  expect_true(detect_site(flow)$wired)
+})
+
+test_that("detect_site() does not treat index.qmd alone as wired", {
+  root <- withr::local_tempdir()
+  writeLines(c("website:", "  sidebar:", "    contents:", "      - index.qmd"),
+             fs::path(root, "_quarto.yml"))
+  expect_false(detect_site(root)$wired)
+})
+
 test_that("init() embed mode points at wire() when an unwired Quarto site exists", {
   root <- withr::local_tempdir()
   writeLines(c("project:", "  type: website"),

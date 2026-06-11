@@ -195,4 +195,120 @@ test_that("wire() leaves an unrecognized config untouched and guides", {
 
   expect_false(res$changed)
   expect_equal(readLines(fs::path(root, "_quarto.yml")), before)
+  # The message is honest about a structured sidebar, not the false
+  # "already surfaces qmd automatically" claim.
+  expect_message(wire(root), "structured sidebar")
+})
+
+test_that("wire() guides honestly for a Quarto book (does not claim auto)", {
+  root <- withr::local_tempdir()
+  writeLines(c(
+    "project:",
+    "  type: book",
+    "book:",
+    "  title: My book",
+    "  chapters:",
+    "    - index.qmd",
+    "    - intro.qmd"
+  ), fs::path(root, "_quarto.yml"))
+  before <- readLines(fs::path(root, "_quarto.yml"))
+
+  res <- suppressMessages(wire(root))
+
+  expect_false(res$changed)
+  expect_equal(readLines(fs::path(root, "_quarto.yml")), before)
+  expect_message(wire(root), "book")
+})
+
+test_that("wire() notes the skipped sidebar when only the render list is edited", {
+  root <- withr::local_tempdir()
+  # Nested sidebar (skipped) + an explicit render allowlist (edited).
+  writeLines(c(
+    "project:",
+    "  type: website",
+    "  render:",
+    "    - index.qmd",
+    "website:",
+    "  sidebar:",
+    "    contents:",
+    "      - section: Reference",
+    "        contents:",
+    "          - index.qmd"
+  ), fs::path(root, "_quarto.yml"))
+
+  # The skipped-sidebar note rides on the same (one-and-only) editing call.
+  expect_message(res <- wire(root), "structured sidebar")
+  expect_true(res$changed)
+})
+
+test_that("wire() does not crash on a scalar where a map is expected", {
+  root <- withr::local_tempdir()
+  # Valid YAML, malformed as Quarto config: website is a scalar, not a map.
+  writeLines(c("project:", "  type: website", "website: mysite"),
+             fs::path(root, "_quarto.yml"))
+  before <- readLines(fs::path(root, "_quarto.yml"))
+
+  expect_no_error(res <- suppressMessages(wire(root)))
+  expect_false(res$changed)
+  expect_equal(readLines(fs::path(root, "_quarto.yml")), before)
+})
+
+test_that("wire() reports a clean message (no edit) on malformed YAML", {
+  root <- withr::local_tempdir()
+  writeLines(c("project:", "  type: website", "  render: [unbalanced"),
+             fs::path(root, "_quarto.yml"))
+  before <- readLines(fs::path(root, "_quarto.yml"))
+
+  expect_no_error(res <- suppressMessages(wire(root)))
+  expect_false(res$changed)
+  expect_equal(readLines(fs::path(root, "_quarto.yml")), before)
+  expect_message(wire(root), "parse")
+})
+
+test_that("wire() preserves YAML booleans as true/false, not yes/no", {
+  root <- withr::local_tempdir()
+  writeLines(c(
+    "project:",
+    "  type: website",
+    "execute:",
+    "  enabled: false",
+    "website:",
+    "  sidebar:",
+    "    contents:",
+    "      - index.qmd"
+  ), fs::path(root, "_quarto.yml"))
+
+  suppressMessages(wire(root))
+
+  written <- readLines(fs::path(root, "_quarto.yml"))
+  expect_false(any(grepl("enabled:\\s*(yes|no)\\b", written)))
+  expect_true(any(grepl("enabled:\\s*false", written)))
+  # And it still round-trips to the right value.
+  yml <- yaml::read_yaml(fs::path(root, "_quarto.yml"))
+  expect_false(yml$execute$enabled)
+})
+
+test_that("wire() preserves the earliest backup across repeated edits", {
+  root <- withr::local_tempdir()
+  pristine <- c(
+    "project:",
+    "  type: website",
+    "  render:",
+    "    - index.qmd  # keep this comment",
+    "website:",
+    "  sidebar:",
+    "    contents:",
+    "      - index.qmd"
+  )
+  writeLines(pristine, fs::path(root, "_quarto.yml"))
+
+  suppressMessages(wire(root))          # first edit -> .bak captures pristine
+  bak <- fs::path(root, "_quarto.yml.bak")
+  expect_equal(readLines(bak), pristine)
+
+  # A second, distinct edit must not clobber the pristine backup.
+  writeLines(c("project:", "  render:", "    - new.qmd"),
+             fs::path(root, "_quarto.yml"))
+  suppressMessages(wire(root))
+  expect_equal(readLines(bak), pristine)
 })

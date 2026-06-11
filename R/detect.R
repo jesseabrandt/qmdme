@@ -52,18 +52,52 @@ site_connected <- function(site) {
 
 #' Does a root `_quarto.yml` already reference the `qmd` directory?
 #'
-#' Tokenizes the config and looks for the `qmd` *directory* -- a bare `qmd`
-#' token or a `qmd/...` path. Crucially this does **not** match a `.qmd`
-#' *filename* like `index.qmd`, which would otherwise make every contents list
-#' look already-wired (the extension ends in "qmd"). The token split is on YAML
-#' punctuation (whitespace, `-`, `:`, `,`, brackets, quotes), so `qmd`,
-#' `- qmd`, and `qmd/index.qmd` all count while `index.qmd` does not.
+#' Looks for the `qmd` *directory* appearing as a navigation/render **sequence
+#' element** -- a `- qmd` list item, a `qmd/...` path item, or an inline
+#' `[qmd, ...]` flow entry. Deliberately strict, for two reasons:
+#'
+#' * It must **not** match a `.qmd` *filename* like `index.qmd` (the extension
+#'   ends in "qmd"), which would make every contents list look already-wired.
+#' * It must **not** be fooled by `qmd` appearing as a mapping *value*
+#'   (`output-dir: qmd`), inside a hyphenated identifier (`analysis-qmd-v2.R`),
+#'   or in a YAML comment (`# - qmd`) -- each of those used to read as
+#'   "already wired" and silently disable [wire()] and [sync()]'s warning.
+#'
+#' Stays textual (no YAML parse) so it never throws on a malformed config and
+#' is cheap enough for [sync()] to call on every run. Biased toward
+#' under-matching: a missed reference makes `wire()`/`sync()` louder (offer to
+#' wire, warn), which is recoverable, whereas a false match fails silently.
 #' @keywords internal
 quarto_references_qmd <- function(quarto_yml) {
-  lines <- readLines(quarto_yml, warn = FALSE)
-  tokens <- unlist(strsplit(lines, "[][[:space:],:\"'-]+"))
-  tokens <- tokens[nzchar(tokens)]
-  any(tokens == "qmd" | startsWith(tokens, "qmd/"))
+  lines <- strip_yaml_comments(readLines(quarto_yml, warn = FALSE))
+  any(vapply(lines, line_references_qmd, logical(1)))
+}
+
+#' Strip trailing `# ...` comments from YAML lines
+#'
+#' A YAML comment is a `#` at line start or preceded by whitespace; a `#` glued
+#' to non-space (e.g. inside a URL fragment) is not a comment. Best-effort: does
+#' not track multi-line quoted scalars, which `_quarto.yml` nav rarely uses.
+#' @keywords internal
+strip_yaml_comments <- function(lines) {
+  sub("(^|\\s)#.*$", "\\1", lines)
+}
+
+#' Does a single (comment-stripped) line reference `qmd` as a sequence element?
+#' @keywords internal
+line_references_qmd <- function(line) {
+  vals <- character(0)
+  trimmed <- sub("^\\s+", "", line)
+  # Block sequence item: "- value" (the value, not a "- key: ..." mapping item).
+  if (grepl("^-\\s+", trimmed)) {
+    vals <- c(vals, sub("^-\\s+", "", trimmed))
+  }
+  # Flow sequence(s): comma-separated items inside [ ... ].
+  for (flow in regmatches(line, gregexpr("\\[[^]]*\\]", line))[[1]]) {
+    vals <- c(vals, strsplit(gsub("[][]", "", flow), ",")[[1]])
+  }
+  vals <- trimws(gsub("[\"']", "", vals))
+  any(vals == "qmd" | startsWith(vals, "qmd/"))
 }
 
 #' Next-step instructions for `init()`, given a detected site

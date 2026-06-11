@@ -59,14 +59,30 @@ wire <- function(path = ".", backup = TRUE) {
   bak <- NA_character_
   if (backup) {
     bak <- paste0(site$file, ".bak")
-    fs::file_copy(site$file, bak, overwrite = TRUE)
+    # Preserve the earliest (pristine, fully-commented) backup -- don't clobber
+    # it if a later wire() edit runs, since by then the live file is already
+    # de-commented.
+    if (!fs::file_exists(bak)) fs::file_copy(site$file, bak)
   }
-  yaml::write_yaml(edit$yml, site$file)
+  write_quarto_yml(edit$yml, site$file)
   message(edit$message,
           if (backup) sprintf(" (backup: %s)", fs::path_file(bak)) else "",
           "\nNote: writing the config drops YAML comments and reformats it",
           if (backup) "; the original is in the .bak file." else ".")
   invisible(wire_result("quarto", site$file, TRUE, bak))
+}
+
+#' Write a `_quarto.yml` from a parsed config, atomically and faithfully
+#'
+#' Writes to a sibling temp file then renames into place, so an interrupted
+#' write can never leave a truncated `_quarto.yml`. Logicals are emitted
+#' verbatim (`true`/`false`) rather than `yaml`'s default `yes`/`no`, so a
+#' round-trip changes only comments and whitespace, nothing semantic.
+#' @keywords internal
+write_quarto_yml <- function(yml, path) {
+  tmp <- paste0(path, ".qmdme-tmp")
+  yaml::write_yaml(yml, tmp, handlers = list(logical = yaml::verbatim_logical))
+  fs::file_move(tmp, path)
 }
 
 #' @keywords internal
@@ -87,23 +103,37 @@ plan_quarto_edit <- function(quarto_yml) {
                 message = "`qmd` is already referenced in _quarto.yml -- nothing to change."))
   }
 
-  yml <- yaml::read_yaml(quarto_yml)
+  yml <- tryCatch(yaml::read_yaml(quarto_yml), error = function(e) e)
+  if (inherits(yml, "error")) {
+    return(list(changed = FALSE, yml = NULL,
+                message = paste0(
+                  "Could not parse _quarto.yml (", conditionMessage(yml),
+                  "). Fix the YAML, then re-run `wire()` -- or add `qmd` to ",
+                  "your sidebar `contents:` by hand.")))
+  }
+
   changed <- FALSE
   did <- character(0)
+  skipped_sidebar <- FALSE
 
   # 1. Explicit sidebar contents list that omits qmd -> add it. `contents: auto`
   # is Quarto's "list every page yourself? no, auto-generate" keyword, so the
-  # companions already appear -- leave it alone.
-  contents <- yml[["website"]][["sidebar"]][["contents"]]
+  # companions already appear -- leave it alone. `pluck()` walks the path
+  # safely, returning NULL (not a "subscript out of bounds" error) if any
+  # intermediate node is a scalar rather than the expected map.
+  contents <- pluck(yml, "website", "sidebar", "contents")
   if (is_simple_list(contents) && !identical(as.character(contents), "auto")) {
     yml[["website"]][["sidebar"]][["contents"]] <-
       c(as.list(contents), "qmd")
     changed <- TRUE
     did <- c(did, "the sidebar")
+  } else if (!is.null(contents) && !identical(as.character(contents), "auto")) {
+    # A structured sidebar (nested sections) we deliberately don't rewrite.
+    skipped_sidebar <- TRUE
   }
 
   # 2. Explicit project render allowlist that omits qmd -> add it.
-  render <- yml[["project"]][["render"]]
+  render <- pluck(yml, "project", "render")
   if (is_simple_list(render)) {
     yml[["project"]][["render"]] <- c(as.list(render), "qmd/*.qmd")
     changed <- TRUE
@@ -111,15 +141,61 @@ plan_quarto_edit <- function(quarto_yml) {
   }
 
   if (!changed) {
-    return(list(changed = FALSE, yml = NULL,
-                message = paste0(
-                  "Your site already surfaces `qmd` automatically (auto ",
-                  "sidebar / no render restriction) -- nothing to change. ",
-                  "Run `quarto render`.")))
+    return(list(changed = FALSE, yml = NULL, message = no_edit_message(yml)))
   }
-  list(changed = TRUE, yml = yml,
-       message = sprintf("Added `qmd` to %s in _quarto.yml.",
-                         paste(did, collapse = " and ")))
+
+  msg <- sprintf("Added `qmd` to %s in _quarto.yml.",
+                 paste(did, collapse = " and "))
+  if (skipped_sidebar) {
+    msg <- paste0(msg, " (Left your structured sidebar alone -- add `qmd` to ",
+                  "its `contents:` by hand if you want it listed there too.)")
+  }
+  list(changed = TRUE, yml = yml, message = msg)
+}
+
+#' Walk a nested list by a sequence of keys, safely
+#'
+#' Like `purrr::pluck()` but dependency-free: returns `NULL` as soon as an
+#' intermediate node is not a list, instead of raising "subscript out of
+#' bounds" when a config has a scalar where a map was expected
+#' (e.g. `website: mysite`).
+#' @keywords internal
+pluck <- function(x, ...) {
+  for (key in c(...)) {
+    if (!is.list(x)) return(NULL)
+    x <- x[[key]]
+  }
+  x
+}
+
+#' Explain why `wire()` made no edit, accurately for each config shape
+#'
+#' Reached only when there is no flat sidebar/render list to append to. The old
+#' message claimed the site "already surfaces qmd automatically", which is false
+#' for a Quarto book (chapters are an explicit allowlist) and for a structured
+#' nested sidebar (qmd will not appear on its own). Distinguish those so the
+#' guidance is honest.
+#' @keywords internal
+no_edit_message <- function(yml) {
+  if (identical(pluck(yml, "project", "type"), "book") ||
+        !is.null(pluck(yml, "book"))) {
+    return(paste0(
+      "This is a Quarto book, which renders only the chapters you list. Add ",
+      "your `qmd/*.qmd` pages to the `book: chapters:` list in _quarto.yml by ",
+      "hand."))
+  }
+  contents <- pluck(yml, "website", "sidebar", "contents")
+  if (!is.null(contents) && !identical(as.character(contents), "auto")) {
+    return(paste0(
+      "Your _quarto.yml has a structured sidebar (nested sections) that ",
+      "`wire()` won't edit automatically. Add `qmd` -- or specific ",
+      "`qmd/*.qmd` pages -- to the sidebar `contents:` by hand."))
+  }
+  paste0(
+    "Found no explicit sidebar `contents:` or `project: render:` list to add ",
+    "`qmd` to. A minimal Quarto site surfaces `qmd/` automatically; if your ",
+    "companions don't appear after `quarto render`, add `qmd` to a sidebar ",
+    "`contents:` list.")
 }
 
 #' Is `x` a flat list/vector of scalars (a YAML sequence we can append to)?

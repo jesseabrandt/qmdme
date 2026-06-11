@@ -7,11 +7,23 @@
 quarto_references_qmd(quarto_yml)
 }
 \description{
-Tokenizes the config and looks for the \code{qmd} \emph{directory} -- a bare \code{qmd}
-token or a \code{qmd/...} path. Crucially this does \strong{not} match a \code{.qmd}
-\emph{filename} like \code{index.qmd}, which would otherwise make every contents list
-look already-wired (the extension ends in "qmd"). The token split is on YAML
-punctuation (whitespace, \code{-}, \code{:}, \verb{,}, brackets, quotes), so \code{qmd},
-\code{- qmd}, and \code{qmd/index.qmd} all count while \code{index.qmd} does not.
+Looks for the \code{qmd} \emph{directory} appearing as a navigation/render \strong{sequence
+element} -- a \code{- qmd} list item, a \code{qmd/...} path item, or an inline
+\verb{[qmd, ...]} flow entry. Deliberately strict, for two reasons:
+}
+\details{
+\itemize{
+\item It must \strong{not} match a \code{.qmd} \emph{filename} like \code{index.qmd} (the extension
+ends in "qmd"), which would make every contents list look already-wired.
+\item It must \strong{not} be fooled by \code{qmd} appearing as a mapping \emph{value}
+(\code{output-dir: qmd}), inside a hyphenated identifier (\code{analysis-qmd-v2.R}),
+or in a YAML comment (\verb{# - qmd}) -- each of those used to read as
+"already wired" and silently disable \code{\link[=wire]{wire()}} and \code{\link[=sync]{sync()}}'s warning.
+}
+
+Stays textual (no YAML parse) so it never throws on a malformed config and
+is cheap enough for \code{\link[=sync]{sync()}} to call on every run. Biased toward
+under-matching: a missed reference makes \code{wire()}/\code{sync()} louder (offer to
+wire, warn), which is recoverable, whereas a false match fails silently.
 }
 \keyword{internal}
