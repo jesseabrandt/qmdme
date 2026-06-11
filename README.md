@@ -13,7 +13,7 @@ human framing.
 
 ```r
 # install.packages("remotes")
-remotes::install_github("jesseabrandt/qmdme")
+remotes::install_github("jessebrandtdata/qmdme")
 ```
 
 ## Use
