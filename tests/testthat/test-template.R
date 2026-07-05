@@ -24,6 +24,17 @@ test_that("build_code_section uses longer fence when code contains backticks", {
   expect_true(grepl("\n````\n$", out, perl = TRUE))
 })
 
+test_that("chunk_fence uses the minimum 3 backticks when code has none", {
+  expect_equal(chunk_fence("x <- 1\ny <- 2"), "```")
+})
+
+test_that("chunk_fence escalates past a 4-backtick run in the source", {
+  # A source line with four backticks would close a 4-backtick outer fence, so
+  # the fence must grow to five. (The 3->4 case is covered via sync in
+  # test-sync.R and build_code_section above.)
+  expect_equal(chunk_fence("a\n````\nb"), "`````")
+})
+
 test_that("build_full_template produces frontmatter, prose stub, and code section", {
   out <- build_full_template(source_path = "R/fit.R", lang = "r",
                              code = "fit_model <- function() {}")

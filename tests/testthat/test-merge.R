@@ -45,6 +45,24 @@ test_that("merge_with_sentinel handles sentinel as first line", {
   expect_false(grepl("old", out$contents, fixed = TRUE))
 })
 
+test_that("merge_with_sentinel splices at the FIRST sentinel when several exist", {
+  # A file can accrue a second sentinel (e.g. an earlier 'recovered' append
+  # below prose that itself contained one). The splice must keep only prose
+  # above the first sentinel and drop everything at/after it, including the
+  # later sentinel -- so re-sync converges instead of accumulating sections.
+  existing <- paste(c("prose above",
+                      "<!-- qmdme:code-below one -->", "stale one",
+                      "<!-- qmdme:code-below two -->", "stale two"),
+                    collapse = "\n")
+  new_section <- "<!-- qmdme:code-below new -->\nfresh\n"
+  out <- merge_with_sentinel(existing, new_section)
+  expect_true(out$had_sentinel)
+  expect_match(out$contents, "prose above", fixed = TRUE)
+  expect_match(out$contents, "fresh", fixed = TRUE)
+  expect_false(grepl("stale one", out$contents, fixed = TRUE))
+  expect_false(grepl("stale two", out$contents, fixed = TRUE))
+})
+
 test_that("merge_with_sentinel reports had_sentinel=FALSE when prefix appears only mid-line", {
   # User prose contains the sentinel string inline, but no line *starts* with
   # it -- the splice/append decision must be driven by line-prefix match.
