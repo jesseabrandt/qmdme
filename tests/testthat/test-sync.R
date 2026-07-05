@@ -156,6 +156,73 @@ test_that("sync warns and skips when paths entry escapes root (audit #5)", {
   expect_equal(nrow(out), 0)
 })
 
+test_that("sync maps a .py source to a {python, eval=FALSE} chunk end-to-end", {
+  root <- withr::local_tempdir()
+  fs::dir_create(fs::path(root, "py"))
+  writeLines("z = 3", fs::path(root, "py", "u.py"))
+  sync(root = root)
+  py <- paste(readLines(fs::path(root, "qmd", "py", "u.qmd")), collapse = "\n")
+  expect_match(py, "{python, eval=FALSE}", fixed = TRUE)
+  expect_match(py, "z = 3", fixed = TRUE)
+})
+
+test_that("sync discovers a case-variant extension and mirrors nested dirs", {
+  root <- withr::local_tempdir()
+  # Uppercase .SQL exercises walk's ignore.case matching; the nested dir
+  # exercises mirror-path preservation into qmd/.
+  fs::dir_create(fs::path(root, "db", "q"))
+  writeLines("SELECT 1", fs::path(root, "db", "q", "big.SQL"))
+  out <- sync(root = root)
+  expect_equal(nrow(out), 1)
+  target <- fs::path(root, "qmd", "db", "q", "big.qmd")
+  expect_true(fs::file_exists(target))
+  # Extension lookup is case-insensitive, so .SQL still lands as an sql chunk.
+  expect_match(paste(readLines(target), collapse = "\n"),
+               "{sql, eval=FALSE}", fixed = TRUE)
+})
+
+test_that("sync self-heals a sentinel-less file then stays stable on re-run", {
+  root <- make_project_with_sources()
+  fs::dir_create(fs::path(root, "qmd", "R"))
+  fit_path <- fs::path(root, "qmd", "R", "fit.qmd")
+  writeLines(c("## Notes", "", "Prose, no sentinel."), fit_path)
+
+  # Run 1: no sentinel -> recovered (append), and the sentinel now exists.
+  out1 <- suppressWarnings(sync(root = root))
+  expect_equal(out1$action[out1$source == fs::path(root, "R", "fit.R")],
+               "recovered")
+
+  # Run 2: the appended sentinel makes it a normal splice -> updated, no warning.
+  out2 <- expect_no_warning(sync(root = root))
+  expect_equal(out2$action[out2$source == fs::path(root, "R", "fit.R")],
+               "updated")
+  expect_match(paste(readLines(fit_path), collapse = "\n"),
+               "Prose, no sentinel.", fixed = TRUE)
+
+  # Run 3: now byte-stable.
+  before <- digest_file(fit_path)
+  sync(root = root)
+  expect_equal(digest_file(fit_path), before)
+})
+
+test_that("sync warns about a bad path entry but still syncs the valid ones", {
+  root <- make_project_with_sources()
+  out <- NULL
+  expect_warning(out <- sync(root = root, paths = c("R", "nope")),
+                 "not directories")
+  # The valid "R" scope is still processed despite the bogus sibling path.
+  expect_equal(nrow(out), 1)
+  expect_true(fs::file_exists(fs::path(root, "qmd", "R", "fit.qmd")))
+})
+
+test_that("sync on a project with no sources returns the empty result schema", {
+  root <- withr::local_tempdir()
+  out <- sync(root = root)
+  expect_s3_class(out, "data.frame")
+  expect_equal(nrow(out), 0)
+  expect_named(out, c("source", "target", "action"))
+})
+
 test_that("sync warns and skips sources whose target would escape qmd/ (audit #6)", {
   # The write-side guard: simulate a source path that, when reflected into
   # qmd/, would resolve outside the qmd/ tree. We exercise this by passing
