@@ -1,0 +1,23 @@
+#!/usr/bin/env sh
+# deploy-hook — palace catalog SOFTWARE install for the qmdme R package.
+#
+# The palace deployer (palace-cd) runs this script from the clone root on every
+# deploy. qmdme ships no service/unit, so under the palace contract a repo that
+# ships an executable deploy-hook but no unit installs as SOFTWARE: the hook is
+# the whole install. Keep it idempotent — it reruns on every branch advance.
+#
+# What it does: install qmdme and its Imports (fs, yaml) into the R library so
+# `library(qmdme)` resolves. remotes::install_local resolves the DESCRIPTION
+# dependency tree (unlike `R CMD INSTALL`, which would fail on missing Imports);
+# force = TRUE reinstalls even when the dev version is unchanged (0.0.0.9000
+# never bumps across deploys, so without force the new code would not land);
+# upgrade = "never" leaves already-installed dependencies untouched. Vignettes
+# are not built (install_local default), so no knitr/pandoc is needed at deploy.
+set -eu
+
+Rscript -e '
+  if (!requireNamespace("remotes", quietly = TRUE))
+    install.packages("remotes", repos = "https://cloud.r-project.org")
+  remotes::install_local(getwd(), upgrade = "never", force = TRUE)
+  cat("qmdme", as.character(packageVersion("qmdme")), "installed\n")
+'
