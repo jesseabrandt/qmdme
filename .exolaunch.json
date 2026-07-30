@@ -1,0 +1,15 @@
+{
+  "format": "exolaunch-project",
+  "run": [
+    {
+      "id": "test",
+      "label": "devtools::test()",
+      "cmd": "Rscript -e 'devtools::test()'"
+    },
+    {
+      "id": "document",
+      "label": "devtools::document()",
+      "cmd": "Rscript -e 'devtools::document()'"
+    }
+  ]
+}
